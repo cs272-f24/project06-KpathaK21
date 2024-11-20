@@ -4,25 +4,26 @@ import (
     "context"
     "fmt"
     "strings"
-	"log"
-	"encoding/json"
-	
-    chroma "github.com/amikos-tech/chroma-go"
-    openai "github.com/sashabaranov/go-openai"
+    "log"
+    "encoding/json"
+
+    chroma "github.com/amikos-tech/chroma-go" 
+    openai "github.com/sashabaranov/go-openai" 
 )
 
-// ChatBot uses LLMClient and MetadataExtractor to answer questions
+// ChatBot struct combines LLM client, metadata extraction, and ChromaDB collections
+// to answer user queries about courses.
 type ChatBot struct {
-    llmClient            *LLMClient
-    metadata             *MetadataExtractor
-    chromaCtx            context.Context
-    chromaClient         *chroma.Client
-    courseCollection     *chroma.Collection
-    instructorCollection *chroma.Collection
+    llmClient            *LLMClient          
+    metadata             *MetadataExtractor   
+    chromaCtx            context.Context     
+    chromaClient         *chroma.Client       
+    courseCollection     *chroma.Collection  
+    instructorCollection *chroma.Collection  
+    context              []openai.ChatCompletionMessage 
 }
 
-
-// NewChatBot initializes a ChatBot with an LLM client, metadata extractor, and ChromaDB context
+// NewChatBot initializes and returns a new ChatBot instance.
 func NewChatBot(llmClient *LLMClient, metadata *MetadataExtractor, chromaCtx context.Context, chromaClient *chroma.Client, courseCollection, instructorCollection *chroma.Collection) *ChatBot {
     return &ChatBot{
         llmClient:         llmClient,
@@ -31,17 +32,26 @@ func NewChatBot(llmClient *LLMClient, metadata *MetadataExtractor, chromaCtx con
         chromaClient:      chromaClient,
         courseCollection:  courseCollection,
         instructorCollection: instructorCollection,
+        context: []openai.ChatCompletionMessage{
+            {
+                Role:    openai.ChatMessageRoleSystem, // System message for LLM initialization
+                Content: "You are a course assistant. Your role is to help users find course information. " +
+                          "If the user asks about courses, invoke the function 'query_courses' with the following fields: " +
+                          "'instructor', 'subject', 'title', or 'course'. Infer these fields from the user's query.",
+            },
+        },
     }
 }
 
+// QueryCourses searches the ChromaDB collection for courses based on the query type and term.
 func (bot *ChatBot) QueryCourses(term, queryType string) string {
-    instructors := InitializeInstructors()
+    instructors := InitializeInstructors() // Load instructor aliases
     var queryTerms []string
 
-    // Handle query type
+    // Determine the type of query and prepare search terms
     switch queryType {
     case "instructor":
-        // Resolve the canonical name for the instructor
+        // Convert instructor name to canonical form
         term = findCanonicalName(term, instructors)
         if term == "" {
             return fmt.Sprintf("No valid instructor found for '%s'.", term)
@@ -65,19 +75,19 @@ func (bot *ChatBot) QueryCourses(term, queryType string) string {
         return "Invalid query type. Please specify 'instructor', 'subject', 'title', or 'combined'."
     }
 
-    // Query the collection
+    // Query ChromaDB for matching courses
     queryResults, err := bot.courseCollection.Query(bot.chromaCtx, queryTerms, 10, nil, nil, nil)
     if err != nil {
         log.Printf("Error querying collection: %v", err)
         return "An error occurred while searching for courses."
     }
 
-    // Check if results are empty
+    // Handle case when no results are found
     if len(queryResults.Documents) == 0 {
         return fmt.Sprintf("No courses found for '%s'.", term)
     }
 
-    // Format the results
+    // Format results for output
     var result strings.Builder
     switch queryType {
     case "instructor":
@@ -90,36 +100,29 @@ func (bot *ChatBot) QueryCourses(term, queryType string) string {
         result.WriteString(fmt.Sprintf("Here are the courses matching the criteria '%s':\n", term))
     }
 
-    // Iterate through documents and append to results
+    // Append each document to the results
     for _, doc := range queryResults.Documents {
-        // Convert the document array to a single string for readability
-        result.WriteString(fmt.Sprintf("- %s\n", strings.Join(doc, " ")))
+        result.WriteString(fmt.Sprintf("- %s\n", strings.Join(doc, " "))) // Join document fields for readability
     }
 
     return result.String()
 }
 
+// AnswerQuestion processes user questions using LLM and invokes relevant tools for queries.
 func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
-    queryTool := MakeTool()
+    queryTool := MakeTool() // Define the query tool for LLM function invocation
 
-    // Updated system prompt to encourage correct argument inference
-    dialogue := []openai.ChatCompletionMessage{
-        {
-            Role: openai.ChatMessageRoleSystem,
-            Content: "You are a course assistant. Your role is to help users find course information. " +
-                "If the user asks about courses, invoke the function 'query_courses' with the following fields: " +
-                "'instructor', 'subject', 'title', or 'course'. Infer these fields from the user's query.",
-        },
-        {
-            Role: openai.ChatMessageRoleUser,
-            Content: question,
-        },
-    }
+    // Add user question to the conversation context
+    bot.context = append(bot.context, openai.ChatCompletionMessage{
+        Role:    openai.ChatMessageRoleUser,
+        Content: question,
+    })
 
+    // Generate a response using OpenAI's ChatCompletion API
     resp, err := bot.llmClient.client.CreateChatCompletion(context.Background(),
         openai.ChatCompletionRequest{
-            Model:     openai.GPT4oMini,
-            Messages:  dialogue,
+            Model:     openai.GPT4oMini, 
+            Messages:  bot.context,
             Functions: []openai.FunctionDefinition{queryTool},
         },
     )
@@ -134,11 +137,11 @@ func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
         Title      string `json:"title"`
     }
 
-    // Handle tool invocation
+    // Check if the LLM invoked a tool
     if resp.Choices[0].Message.FunctionCall != nil {
         functionCall := resp.Choices[0].Message.FunctionCall
 
-        // Parse arguments passed to the tool
+        // Parse the tool arguments from JSON
         if err := json.Unmarshal([]byte(functionCall.Arguments), &args); err != nil {
             return "", fmt.Errorf("Failed to parse function arguments: %w", err)
         }
@@ -146,7 +149,7 @@ func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
         fmt.Printf("Parsed arguments: Instructor: '%s', Subject: '%s', Course: '%s', Title: '%s'\n",
             args.Instructor, args.Subject, args.Course, args.Title)
 
-        // Call QueryCourses based on parsed arguments
+        // Determine the appropriate query type based on parsed arguments
         var toolResponse string
         if args.Instructor != "" && args.Subject != "" {
             combinedTerm := fmt.Sprintf("%s %s", args.Instructor, args.Subject)
@@ -163,25 +166,40 @@ func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
             toolResponse = "No valid query parameters provided."
         }
 
-        // Append the tool response to the dialogue
-        dialogue = append(dialogue, openai.ChatCompletionMessage{
+        // Add the tool response to the conversation context
+        bot.context = append(bot.context, openai.ChatCompletionMessage{
             Role:    openai.ChatMessageRoleFunction,
             Name:    "query_courses",
             Content: toolResponse,
         })
 
-        // Generate a final response from the LLM based on the tool's output
+        // Generate a final LLM response
         resp, err = bot.llmClient.client.CreateChatCompletion(context.Background(),
             openai.ChatCompletionRequest{
-                Model:    openai.GPT4oMini,
-                Messages: dialogue,
+                Model:    openai.GPT4oMini, 
+                Messages: bot.context,
             },
         )
         if err != nil {
             return "", fmt.Errorf("ChatCompletion failed: %w", err)
         }
-        return resp.Choices[0].Message.Content, nil
+
+        // Extract and return the assistant's final response
+        assistantResponse := resp.Choices[0].Message.Content
+        bot.context = append(bot.context, openai.ChatCompletionMessage{
+            Role:    openai.ChatMessageRoleAssistant,
+            Content: assistantResponse,
+        })
+
+        return assistantResponse, nil
     }
 
-    return "No relevant tool was invoked for the question.", nil
+    // If no tool was invoked, return the LLM's direct response
+    assistantResponse := resp.Choices[0].Message.Content
+    bot.context = append(bot.context, openai.ChatCompletionMessage{
+        Role:    openai.ChatMessageRoleAssistant,
+        Content: assistantResponse,
+    })
+
+    return assistantResponse, nil
 }
