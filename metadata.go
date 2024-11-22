@@ -59,13 +59,14 @@ func InitializeInstructors() []Instructor {
     return []Instructor{
         {CanonicalName: "Philip Peterson", Aliases: []string{"Phil Peterson", "Philip Peterson"}},
         {CanonicalName: "Philip Choong", Aliases: []string{"Phil Choong", "Philip Choong"}},
+        {CanonicalName: "Gregory Benson", Aliases: []string{"Greg Benson", "Gregory Benson"}},
     }
 }
 
 func findCanonicalName(inputName string, instructors []Instructor) string {
-    inputName = strings.TrimSpace(inputName) // Remove leading and trailing whitespace
+    inputName = strings.TrimSpace(inputName)
     if inputName == "" {
-        return inputName // Return immediately if the input is empty
+        return inputName
     }
 
     for _, instructor := range instructors {
@@ -76,9 +77,11 @@ func findCanonicalName(inputName string, instructors []Instructor) string {
             }
         }
     }
+
     fmt.Printf("No canonical substitution found for '%s'. Using original name.\n", inputName)
-    return inputName // Return the original name if no match is found
+    return inputName
 }
+
 
 // uniqueInstructors creates a list of unique instructor canonical names from the courses.
 func uniqueInstructors(courses []Course) []string {
