@@ -5,9 +5,10 @@ import (
     "fmt"
     "strings"
 	"log"
-	//"encoding/json"
+	
     chroma "github.com/amikos-tech/chroma-go"
     openai "github.com/sashabaranov/go-openai"
+
 )
 
 
@@ -78,12 +79,31 @@ func (bot *ChatBot) QueryCourses(term string) string {
 func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
     fmt.Printf("Processing question: %s\n", question)
 
-    // Add the user's question to the context
+    // Check if the question is a web search query
+    if strings.Contains(strings.ToLower(question), "take me to the web page") {
+        // Extract the search query
+        query := strings.Replace(strings.ToLower(question), "take me to the web page where i can", "", 1)
+        query = strings.TrimSpace(query)
+
+        // Perform web search using the LLM
+        webSearchPrompt := fmt.Sprintf("Search the web and provide a list of links for the query: '%s'", query)
+        systemMessage := "You are a web search assistant. Generate a list of clickable links for the query provided."
+
+        webSearchResponse, err := bot.llmClient.ChatCompletion(webSearchPrompt, systemMessage)
+        if err != nil {
+            return "", fmt.Errorf("web search failed: %w", err)
+        }
+
+        return webSearchResponse, nil
+    }
+
+    // Add the user's question to the context for course-related queries
     bot.context = append(bot.context, openai.ChatCompletionMessage{
         Role:    openai.ChatMessageRoleUser,
         Content: question,
     })
 
+    // Handle course-related queries as usual
     instructors := InitializeInstructors()
     for _, instructor := range instructors {
         for _, alias := range instructor.Aliases {
@@ -93,7 +113,6 @@ func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
         }
     }
 
-    // Use the appropriate collection for the query
     var collectionToQuery *chroma.Collection
     if strings.Contains(strings.ToLower(question), "instructor") {
         collectionToQuery = bot.instructorCollection
@@ -111,23 +130,19 @@ func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
         }
         preamble += "\nPlease use this information to answer the user's question."
     } else {
-        // Fallback if no documents are found
         preamble = "Provide accurate information based on the context of university courses and instructors."
     }
 
-    // Add the preamble to the context
     bot.context = append(bot.context, openai.ChatCompletionMessage{
         Role:    openai.ChatMessageRoleAssistant,
         Content: preamble,
     })
 
-    // Create the chat completion request
     req := openai.ChatCompletionRequest{
         Model:    openai.GPT4oMini,
         Messages: bot.context,
     }
 
-    // Call the LLM API
     response, err := bot.llmClient.client.CreateChatCompletion(context.Background(), req)
     if err != nil {
         return "", fmt.Errorf("ChatCompletion failed: %w", err)
@@ -135,13 +150,10 @@ func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
 
     if len(response.Choices) > 0 {
         reply := response.Choices[0].Message.Content
-
-        // Add the assistant's reply to the context
         bot.context = append(bot.context, openai.ChatCompletionMessage{
             Role:    openai.ChatMessageRoleAssistant,
             Content: reply,
         })
-
         return reply, nil
     }
 

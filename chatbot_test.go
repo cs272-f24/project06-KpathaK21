@@ -58,27 +58,31 @@ func TestContext(t *testing.T) {
 	question1 := "Who is teaching CS 272?"
 	answer1, _:= chatbot.AnswerQuestion(question1)
 	fmt.Printf("Answer for question '%s':\n%s\n", question1, answer1)
-	// if err1 != nil || !strings.Contains(answer1, "Philip Peterson is teaching CS 272") {
-	// 	t.Errorf("Expected answer to mention 'Philip Peterson is teaching CS 272', got: %v", answer1)
-	// }
 
 	// Second question: What's his email address?
 	question2 := "What's his email address?"
 	answer2, _ := chatbot.AnswerQuestion(question2)
 	fmt.Printf("Answer for question '%s':\n%s\n", question2, answer2)
-	// if err2 != nil || !strings.Contains(answer2, "Philip Peterson's email address is phpeterson@usfca.edu") {
-	// 	t.Errorf("Expected answer to mention 'Philip Peterson's email address is phpeterson@usfca.edu', got: %v", answer2)
-	// }
 }
 
 func TestMultiple(t *testing.T) {
 	chatbot := RealChatBot()
 
 	// Question: What CS courses are Phil Peterson and Greg Benson teaching?
-	question := "What CS course are Phil Peterson and Greg Benson teaching?"
+	question := "What CS courses are Phil Peterson and Greg Benson teaching?"
 	answer, _ := chatbot.AnswerQuestion(question)
 
 	// Print the response
 	fmt.Printf("Answer for question '%s':\n%s\n", question, answer)
 
+}
+
+// TestLocation tests queries with location constraints
+func TestLocation(t *testing.T) {
+	chatbot := RealChatBot()
+
+	question := "What CS course is Phil Peterson teaching in LS G12?"
+	answer, _  := chatbot.AnswerQuestion(question)
+
+	fmt.Printf("Answer for question '%s':\n%s\n", question, answer)
 }
