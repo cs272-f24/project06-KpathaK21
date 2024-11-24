@@ -5,7 +5,6 @@ import (
     "fmt"
     "strings"
     "log"
-    "encoding/json"
 
     chroma "github.com/amikos-tech/chroma-go"
     openai "github.com/sashabaranov/go-openai"
