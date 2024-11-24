@@ -117,9 +117,9 @@ func addCourseWithRetry(ctx context.Context, collection *chroma.Collection, meta
 // Query searches the ChromaDB collection for a term and retrieves matching documents
 func Query(ctx context.Context, client *chroma.Client, collection *chroma.Collection, term string) [][]string {
     terms := []string{term}
-    fmt.Printf("Querying for term: %s\n", term)
+    
 
-    queryResults, err := collection.Query(ctx, terms, 5, nil, nil, nil)
+    queryResults, err := collection.Query(ctx, terms, 10, nil, nil, nil)
     if err != nil {
         log.Fatalf("failed to query collection: %v", err)
     }

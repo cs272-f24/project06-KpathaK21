@@ -5,6 +5,9 @@ import (
     "os"
     "bufio"
     "strings"
+    "log"
+
+    "github.com/sahilm/fuzzy"
 )
 
 // MetadataExtractor loads course data and extracts metadata like instructors and departments.
@@ -63,24 +66,55 @@ func InitializeInstructors() []Instructor {
     }
 }
 
+
+// findCanonicalName performs a fuzzy match to find the best canonical name for the input
 func findCanonicalName(inputName string, instructors []Instructor) string {
     inputName = strings.TrimSpace(inputName)
     if inputName == "" {
-        return inputName
+        return ""
     }
 
+    // Build a list of aliases
+    var allAliases []string
+    aliasToCanonical := make(map[string]string) // Map aliases to canonical names
     for _, instructor := range instructors {
         for _, alias := range instructor.Aliases {
-            if strings.EqualFold(inputName, alias) {
-                fmt.Printf("Substituting alias '%s' with canonical name '%s'\n", inputName, instructor.CanonicalName)
-                return instructor.CanonicalName
-            }
+            allAliases = append(allAliases, alias)
+            aliasToCanonical[alias] = instructor.CanonicalName
         }
     }
 
-    fmt.Printf("No canonical substitution found for '%s'. Using original name.\n", inputName)
-    return inputName
+    // Perform fuzzy matching
+    matches := fuzzy.Find(inputName, allAliases)
+    if len(matches) == 0 {
+        log.Printf("No match found for '%s'.", inputName)
+        return ""
+    }
+
+    // Return the canonical name for the best match
+    bestMatch := matches[0].Str
+    canonicalName := aliasToCanonical[bestMatch]
+    log.Printf("Best match for '%s' is '%s', mapped to canonical name '%s'.", inputName, bestMatch, canonicalName)
+    return canonicalName
 }
+// func findCanonicalName(inputName string, instructors []Instructor) string {
+//     inputName = strings.TrimSpace(inputName)
+//     if inputName == "" {
+//         return inputName
+//     }
+// 
+//     for _, instructor := range instructors {
+//         for _, alias := range instructor.Aliases {
+//             if strings.EqualFold(inputName, alias) {
+//                 fmt.Printf("Substituting alias '%s' with canonical name '%s'\n", inputName, instructor.CanonicalName)
+//                 return instructor.CanonicalName
+//             }
+//         }
+//     }
+// 
+//     fmt.Printf("No canonical substitution found for '%s'. Using original name.\n", inputName)
+//     return inputName
+// }
 
 
 // uniqueInstructors creates a list of unique instructor canonical names from the courses.

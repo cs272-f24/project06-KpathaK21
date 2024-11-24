@@ -68,12 +68,16 @@ func TestContext(t *testing.T) {
 func TestMultiple(t *testing.T) {
 	chatbot := RealChatBot()
 
+	fmt.Printf("What CS courses are Phil Peterson and Greg Benson teaching?\n")
 	// Question: What CS courses are Phil Peterson and Greg Benson teaching?
-	question := "What CS courses are Phil Peterson and Greg Benson teaching?"
-	answer, _ := chatbot.AnswerQuestion(question)
+	question1 := "What CS courses is Phil Peterson teaching?"
+	answer1, _ := chatbot.AnswerQuestion(question1)
+
+	question2 := "What CS courses is Greg Benson teaching?"
+	answer2, _ := chatbot.AnswerQuestion(question2)
 
 	// Print the response
-	fmt.Printf("Answer for question '%s':\n%s\n", question, answer)
+	fmt.Printf("Answer for question '%s':\n%s\n", answer1, answer2)
 
 }
 

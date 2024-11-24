@@ -4,8 +4,9 @@ import (
     "context"
     "fmt"
     "strings"
-	"log"
-	
+    "log"
+    "encoding/json"
+
     chroma "github.com/amikos-tech/chroma-go"
     openai "github.com/sashabaranov/go-openai"
 
@@ -43,6 +44,7 @@ func NewChatBot(llmClient *LLMClient, metadata *MetadataExtractor, chromaCtx con
     }
 }
 
+
 func (bot *ChatBot) QueryCourses(term string) string {
     // Find the canonical name for the given term
     instructors := InitializeInstructors()
@@ -77,7 +79,7 @@ func (bot *ChatBot) QueryCourses(term string) string {
 }
 
 func (bot *ChatBot) AnswerQuestion(question string) (string, error) {
-    fmt.Printf("Processing question: %s\n", question)
+    
 
     // Check if the question is a web search query
     if strings.Contains(strings.ToLower(question), "take me to the web page") {
