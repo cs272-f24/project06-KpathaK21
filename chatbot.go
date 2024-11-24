@@ -44,7 +44,6 @@ func NewChatBot(llmClient *LLMClient, metadata *MetadataExtractor, chromaCtx con
     }
 }
 
-
 func (bot *ChatBot) QueryCourses(term string) string {
     // Find the canonical name for the given term
     instructors := InitializeInstructors()

@@ -14,7 +14,7 @@ func MakeTool() openai.FunctionDefinition {
 		Properties: map[string]jsonschema.Definition{
 			"instructor": {
 				Type:        jsonschema.String,
-				Description: "The canonical name or alias of the instructor (e.g., Philip Peterson).",
+				Description: "The canonical name or alias of the instructor (e.g., Philip Peterson & Greg Benson).",
 			},
 			"subject": {
 				Type:        jsonschema.String,
